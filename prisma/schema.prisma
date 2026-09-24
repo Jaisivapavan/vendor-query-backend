@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+enum OrderStatus {
+  COMPLETED
+  CANCELLED
+}
+
+model Vendor {
+  id           String       @id @default(uuid())
+  businessName String
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  
+  categories   Category[]
+  menuItems    MenuItem[]
+  orders       Order[]
+
+  @@map("vendors")
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  vendorId  String
+  name      String
+  
+  vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menuItems MenuItem[]
+
+  @@index([vendorId])
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String      @id @default(uuid())
+  vendorId    String
+  categoryId  String
+  name        String
+  price       Float
+  isAvailable Boolean     @default(true)
+
+  vendor      Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+model Order {
+  id            String        @id @default(uuid())
+  vendorId      String
+  orderNumber   Int           @default(autoincrement())
+  totalAmount   Float
+  taxAmount     Float
+  paymentMethod PaymentMethod
+  status        OrderStatus   @default(COMPLETED)
+  createdAt     DateTime      @default(now())
+
+  vendor        Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items         OrderItem[]
+
+  @@index([vendorId, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  menuItemId String
+  quantity   Int
+  unitPrice  Float
+  subtotal   Float
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([menuItemId])
+  @@map("order_items")
+}
