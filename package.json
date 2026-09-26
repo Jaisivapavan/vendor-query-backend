@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "client": "npm run dev --prefix frontend",
-    "build": "npm run build --prefix frontend && tsc",
+    "build": "npx prisma generate && npm --prefix frontend install && npm --prefix frontend run build && tsc",
     "start": "node dist/server.js",
     "test": "jest --detectOpenHandles --forceExit",
     "prisma:generate": "prisma generate",
