@@ -18,6 +18,7 @@ export class ChatController {
     res.flushHeaders?.();
 
     const sendEvent = (type: 'status' | 'chunk' | 'error' | 'done', payload: any) => {
+      if (res.writableEnded || res.closed) return;
       res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
     };
 
@@ -32,18 +33,16 @@ export class ChatController {
         onError: (err) => {
           console.error('Chat stream error:', err);
           sendEvent('error', { error: err.message || 'Stream processing failed' });
-          sendEvent('done', {});
-          res.end();
+          if (!res.writableEnded) res.end();
         },
       });
 
       sendEvent('done', {});
-      res.end();
+      if (!res.writableEnded) res.end();
     } catch (error: any) {
       console.error('Fatal chat controller error:', error);
       sendEvent('error', { error: error.message || 'Internal server error' });
-      sendEvent('done', {});
-      res.end();
+      if (!res.writableEnded) res.end();
     }
   }
 }

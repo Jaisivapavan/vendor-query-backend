@@ -1,0 +1,44 @@
+name: VendorQuery CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Test & Build Production Bundle
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://mock:mock@localhost:5432/mock' }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci_cd_test_jwt_secret_key' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'mock_key' }}
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install Root Dependencies
+        run: npm install
+
+      - name: 📦 Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: 🗄️ Generate Prisma Client
+        run: npx prisma generate
+
+      - name: 🧪 Run Automated Unit & Integration Tests
+        run: npm test
+
+      - name: 🏗️ Build Frontend (React Vite) & Backend (TypeScript)
+        run: npm run build

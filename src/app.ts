@@ -69,23 +69,33 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
 
-// Fallback to index.html for root if not handled by static
-app.get('/', (_req: Request, res: Response) => {
-  const publicIndex = path.join(__dirname, '../public/index.html');
-  res.sendFile(publicIndex, (err) => {
-    if (err) {
-      res.redirect('/docs');
-    }
-  });
-});
+// SPA Fallback & 404 Handler for Express 5
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // If request is for an API endpoint, docs, or health check, return standard 404 JSON
+  if (
+    req.path.startsWith('/api') ||
+    req.path.startsWith('/docs') ||
+    req.path.startsWith('/api-docs') ||
+    req.path === '/health'
+  ) {
+    return res.status(404).json({
+      success: false,
+      error: 'Endpoint not found',
+      documentation: '/docs',
+    });
+  }
 
-// 404 handler
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    documentation: '/docs',
-  });
+  // For all frontend page routes (GET requests), serve index.html
+  if (req.method === 'GET') {
+    const publicIndex = path.join(__dirname, '../public/index.html');
+    return res.sendFile(publicIndex, (err) => {
+      if (err) {
+        res.status(404).json({ success: false, error: 'Frontend file not found' });
+      }
+    });
+  }
+
+  next();
 });
 
 // Global error handling middleware
