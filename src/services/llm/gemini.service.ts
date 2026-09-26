@@ -55,10 +55,10 @@ Rules you must strictly follow:
 3. Be professional, concise, and provide clear takeaway insights for the restaurant manager. Present monetary amounts in INR (₹) or standard currency format with 2 decimal places.`;
 
       const candidateModels = [
-        'gemini-3-flash-preview',
-        'gemini-2.5-flash',
-        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
         'gemini-flash-latest',
+        'gemini-3.5-flash',
+        'gemini-3-flash-preview',
       ];
 
       let lastError: any = null;
@@ -79,8 +79,8 @@ Rules you must strictly follow:
           break; // Succeeded
         } catch (err: any) {
           lastError = err;
-          // If 503 or 404, try next candidate
-          if (err?.status === 503 || err?.status === 404) {
+          // If 429 (rate-limit / quota), 503, or 404, automatically failover to next candidate model
+          if (err?.status === 429 || err?.status === 503 || err?.status === 404) {
             continue;
           }
           throw err;
