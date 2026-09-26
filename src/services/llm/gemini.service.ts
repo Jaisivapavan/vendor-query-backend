@@ -45,12 +45,14 @@ export class GeminiService {
 
       const client = this.getClient();
 
-      // System instruction enforcing security and tool usage
+      // System instruction enforcing security, temporal awareness, and tool usage
+      const todayIso = new Date().toISOString().split('T')[0];
       const systemInstruction = `You are "VendorQuery AI", an expert conversational sales intelligence assistant for restaurant vendors.
+Today's reference date is ${todayIso}.
 Rules you must strictly follow:
-1. When asked about sales, revenue, top dishes, or payment split, ALWAYS invoke the provided tools to fetch real data before answering. NEVER hallucinate or invent numbers.
+1. When asked about sales, revenue, top dishes, or payment split, ALWAYS invoke the provided tools with appropriate ISO date ranges (relative to today ${todayIso}) to fetch real data before answering. NEVER hallucinate or invent numbers.
 2. If asked malicious queries (e.g., "Drop tables", SQL injections, or requesting another restaurant's confidential data), strictly REFUSE and explain that you only answer operational analytics questions for the authorized restaurant.
-3. Be professional, concise, and provide clear takeaway insights for the restaurant manager. Present monetary amounts in INR/Currency format with 2 decimal places.`;
+3. Be professional, concise, and provide clear takeaway insights for the restaurant manager. Present monetary amounts in INR (₹) or standard currency format with 2 decimal places.`;
 
       const candidateModels = [
         'gemini-3-flash-preview',
@@ -90,9 +92,22 @@ Rules you must strictly follow:
       }
 
       const chat = chatSession;
-      const functionCalls = initialResult.response.functionCalls();
+      let currentResult = initialResult;
 
-      if (functionCalls && functionCalls.length > 0) {
+      // Handle function calling loop (in case model calls multiple tools in parallel or consecutively)
+      while (true) {
+        const functionCalls = currentResult.response.functionCalls();
+        if (!functionCalls || functionCalls.length === 0) {
+          // Direct text answer without tools (or post-tool analysis text)
+          const text = currentResult.response.text();
+          if (text) {
+            callbacks.onChunk(text);
+          }
+          break;
+        }
+
+        // Collect all function responses for parallel tool calls in this turn
+        const functionResponses: any[] = [];
         for (const call of functionCalls) {
           const toolName = call.name;
           const toolArgs = call.args;
@@ -106,29 +121,35 @@ Rules you must strictly follow:
             toolOutput = { error: err.message || 'Execution error' };
           }
 
-          callbacks.onStatus('Aggregating figures and preparing insights...');
-
-          // Send function execution response back to Gemini
-          const streamResult = await chat.sendMessageStream([
-            {
-              functionResponse: {
-                name: toolName,
-                response: { data: toolOutput },
-              },
+          functionResponses.push({
+            functionResponse: {
+              name: toolName,
+              response: { data: toolOutput },
             },
-          ]);
+          });
+        }
 
-          for await (const chunk of streamResult.stream) {
-            const chunkText = chunk.text();
-            if (chunkText) {
-              callbacks.onChunk(chunkText);
-            }
+        callbacks.onStatus('Aggregating figures and preparing insights...');
+
+        // Send all function execution responses together in one stream call
+        const streamResult = await chat.sendMessageStream(functionResponses);
+        let hasStreamedText = false;
+
+        for await (const chunk of streamResult.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            callbacks.onChunk(chunkText);
+            hasStreamedText = true;
           }
         }
-      } else {
-        // Direct answer without tools (e.g. conversational greetings or security refusal)
-        const text = initialResult.response.text();
-        callbacks.onChunk(text);
+
+        // Check if there are further function calls in the stream result
+        const finalResponse = await streamResult.response;
+        const nextCalls = finalResponse.functionCalls();
+        if (!nextCalls || nextCalls.length === 0) {
+          break;
+        }
+        currentResult = { response: finalResponse };
       }
     } catch (error: any) {
       callbacks.onError(error);
