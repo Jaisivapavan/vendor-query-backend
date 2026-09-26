@@ -2,6 +2,10 @@
 
 > A production-ready, multi-tenant Restaurant POS (Point of Sale) and operational backend powered by Google Gemini tool-calling for deterministic, conversational analytics.
 
+🌐 **Live Production Deployment**: [https://vendor-query-backend.onrender.com](https://vendor-query-backend.onrender.com)  
+📖 **Interactive Swagger UI**: [https://vendor-query-backend.onrender.com/docs](https://vendor-query-backend.onrender.com/docs)  
+📁 **GitHub Repository**: [https://github.com/Jaisivapavan/vendor-query-backend](https://github.com/Jaisivapavan/vendor-query-backend)
+
 ---
 
 ## 🌟 Overview & System Objective

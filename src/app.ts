@@ -2,6 +2,9 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import path from 'path';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './config/swagger';
 
 // Load environment variables
 dotenv.config();
@@ -16,9 +19,23 @@ import chatRoutes from './routes/chat.routes';
 const app: Application = express();
 
 // Security and utility middleware
-app.use(helmet());
+// Disable strict CSP for Swagger UI and static frontend charts/icons
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
 app.use(cors());
 app.use(express.json());
+
+// Serve static frontend assets from public directory
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Swagger UI Interactive API documentation
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Base health check
 app.get('/health', (_req: Request, res: Response) => {
@@ -29,9 +46,11 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-app.get('/', (_req: Request, res: Response) => {
+// JSON API directory endpoint
+app.get('/api', (_req: Request, res: Response) => {
   res.status(200).json({
     message: 'Welcome to VendorQuery - Conversational Sales Intelligence & POS API',
+    documentation: '/docs',
     endpoints: {
       auth: '/api/auth',
       menu: '/api/menu',
@@ -50,11 +69,22 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/chat', chatRoutes);
 
+// Fallback to index.html for root if not handled by static
+app.get('/', (_req: Request, res: Response) => {
+  const publicIndex = path.join(__dirname, '../public/index.html');
+  res.sendFile(publicIndex, (err) => {
+    if (err) {
+      res.redirect('/docs');
+    }
+  });
+});
+
 // 404 handler
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: 'Endpoint not found',
+    documentation: '/docs',
   });
 });
 
